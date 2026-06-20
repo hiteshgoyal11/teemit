@@ -7,7 +7,6 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
 
   if (code) {
-    // 1. Next.js 15 में cookies() async है, इसलिए await का इस्तेमाल करें
     const cookieStore = await cookies()
     
     const supabase = createServerClient(
@@ -15,31 +14,48 @@ export async function GET(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
+          getAll() { return cookieStore.getAll() },
           setAll(cookiesToSet) {
             try {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options)
               )
-            } catch {
-              // Server component से setAll कॉल होने पर इसे इग्नोर किया जा सकता है
-            }
+            } catch {}
           },
         },
       }
     )
 
-    // 2. Google से मिले कोड को Session में बदलें
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    // 1. कोड को असली 'Session' में बदलें
+    const { data: authData, error: authError } = await supabase.auth.exchangeCodeForSession(code)
     
-    if (!error) {
-      // सफ़ल होने पर onboarding पर भेजें
-      return NextResponse.redirect(`${origin}/onboarding`)
+    if (!authError && authData.user) {
+      // 2. 🛑 रीयल-टाइम चेक: क्या इस यूज़र की प्रोफाइल और ऑनबोर्डिंग पूरी है?
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_complete')
+        .eq('id', authData.user.id)
+        .single()
+
+      // 3. प्रोफेशनल रीडायरेक्ट लॉजिक
+      // अगर प्रोफाइल है और ऑनबोर्डिंग 'true' है -> सीधे /home
+      if (profile?.onboarding_complete) {
+        return NextResponse.redirect(`${origin}/home`)
+      }
+
+      // अगर प्रोफाइल नहीं है या ऑनबोर्डिंग 'false' है -> /onboarding
+      // return NextResponse.redirect(`${origin}/onboarding`)
+
+      // Redirect को रोककर डेटा स्क्रीन पर प्रिंट करो
+      return NextResponse.json({ 
+        msg: "🕵️ DEBUG REPORT",
+        user_id: authData.user.id,
+        profile_found: !!profile,
+        onboarding_status: profile?.onboarding_complete 
+      });
     }
   }
 
-  // अगर एरर आता है तो होमपेज या एरर पेज पर भेजें
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  // अगर कुछ भी गलत होता है, तो वापस लैंडिंग पेज पर भेजें
+  return NextResponse.redirect(`${origin}`)
 }
