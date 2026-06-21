@@ -49,7 +49,7 @@ export default function EmailLoginPage() {
     if (error) {
       setErrors({ general: "Invalid email or password. Please try again." })
     } else {
-      window.location.href = '/home'
+      window.location.reload(); // 🛑 रीयल-टाइम चेक के लिए पेज रिफ्रेश करो
     }
     setLoading(false)
   }

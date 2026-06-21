@@ -38,7 +38,6 @@ export async function GET(request: Request) {
         .single()
 
       // 3. प्रोफेशनल रीडायरेक्ट लॉजिक
-      // अगर प्रोफाइल है और ऑनबोर्डिंग 'true' है -> सीधे /home
       if (profile?.onboarding_complete) {
         return NextResponse.redirect(`${origin}/home`)
       }

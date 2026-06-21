@@ -37,22 +37,19 @@ export default async function LandingPage() {
   const { data: { user: authUser } } = await supabase.auth.getUser();
     console.log("--- ✅ STEP 5: Database User Check Finished ---");
 
+
+    // ✅ इसकी जगह ये डालो:
     if (authUser) {
-      // 🛑 यहाँ हम 'profiles' टेबल से ऑनबोर्डिंग का स्टेटस चेक कर रहे हैं
       const { data: profile } = await supabase
         .from('profiles')
         .select('onboarding_complete')
         .eq('id', authUser.id)
         .single();
 
-      // redirect('/home') की जगह ये डालो:
       if (profile?.onboarding_complete) {
-        return <script dangerouslySetInnerHTML={{ __html: `alert("🔍 DEBUG: Onboarding is TRUE. Sending to /home"); window.location.href='/home';` }} />
-      }
-
-      // redirect('/onboarding') की जगह ये डालो:
-      if (!profile?.onboarding_complete) {
-        return <script dangerouslySetInnerHTML={{ __html: `alert("🔍 DEBUG: Onboarding is FALSE. Sending to /onboarding"); window.location.href='/onboarding';` }} />
+        redirect('/home');
+      } else {
+        redirect('/onboarding'); // अगर ऑनबोर्डिंग नहीं हुई तो यहाँ भेजो
       }
     }
 

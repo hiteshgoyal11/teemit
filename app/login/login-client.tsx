@@ -25,7 +25,6 @@ export default function LoginPage() {
               token: response.credential,
             })
             if (!error) {
-              // 🛑 सीधा /home मत भेजो, पेज रिफ्रेश करो ताकि 'Middleware' या 'route.ts' अपना काम करे
               window.location.reload(); 
             }
           },

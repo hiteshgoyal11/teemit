@@ -3,75 +3,131 @@ import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@supabase/ssr'
 import { useRouter } from 'next/navigation'
 
-export default function WelcomeStep() {
-  const [name, setName] = useState('')
+const ROLES = [
+  "Frontend Developer", "Backend Developer", "Fullstack Developer", 
+  "UI/UX Designer", "Product Manager", "Mobile App Developer", 
+  "Founder / CEO", "Data Scientist", "AI Engineer", "Web3 Developer"
+]
+
+export default function RoleStep() {
+  const [selectedRole, setSelectedRole] = useState<string | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(false) 
   const router = useRouter()
   
-  const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!, 
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   useEffect(() => {
-    async function getUserData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        // गूगल से नाम फेच किया
-        setName(user.user_metadata.full_name || '')
-      }
-      setTimeout(() => setIsReady(true), 600) // स्मूथ फेड के लिए
-    }
-    getUserData()
+    // प्रीमियम फ़ेड-इन इफ़ेक्ट के लिए छोटा सा डिले
+    const timer = setTimeout(() => setIsReady(true), 400)
+    return () => clearTimeout(timer)
   }, [])
 
+  // 1. Continue Logic - यह डेटाबेस में डेटा सेव करेगा
   const handleNext = async () => {
+    if (!selectedRole) {
+      setError(true)
+      return
+    }
+
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      await supabase.from('profiles').update({ full_name: name }).eq('id', user.id)
-      router.push('/onboarding/interests')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ role: selectedRole })
+          .eq('id', user.id)
+
+        if (updateError) throw updateError
+        
+        // अगले स्टेप (Interests) पर जाएँ
+        router.push('/onboarding/interests')
+      }
+    } catch (err) {
+      console.error("Error saving role:", err)
+    } finally {
+      setLoading(false)
     }
   }
 
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-white dark:bg-black text-black dark:text-white px-6 relative overflow-hidden transition-colors duration-500">
-      
-      {/* Background Fade Layer */}
-      <div className={`w-full max-w-[450px] transition-all duration-1000 transform ${isReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        
-        <header className="mb-12">
-          <p className="text-[#115488] font-black text-[10px] uppercase tracking-[0.3em] mb-3">Step 01/04</p>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tighter mb-4">Welcome to <span className="italic">teemit.</span></h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Let&apos;s start with how you&apos;d like to be called in the community.</p>
-        </header>
+  // 2. Skip Logic - यह डेटाबेस में कुछ सेव नहीं करेगा, बस आगे बढ़ेगा
+  const handleSkip = () => {
+    router.push('/onboarding/interests')
+  }
 
-        <div className="space-y-8 bg-gray-50/50 dark:bg-[#0A0A0A]/50 border border-gray-100 dark:border-gray-900 p-8 rounded-[32px] backdrop-blur-sm">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 ml-1">Your Full Name</label>
-            <input 
-              type="text" 
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name"
-              className="w-full bg-white dark:bg-black border border-gray-200 dark:border-gray-800 rounded-2xl px-5 py-4 focus:outline-none focus:border-[#115488] transition-all font-medium"
-            />
-          </div>
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-start pt-12 bg-white dark:bg-black text-black dark:text-white px-6 transition-colors duration-500 overflow-y-auto py-20 selection:bg-[#115488] selection:text-white">
+      
+      {/* मुख्य कंटेंट डिब्बा (Content Wrapper) */}
+      <div className={`w-full max-w-[500px] transition-all duration-1000 ${isReady ? 'opacity-100' : 'opacity-0'}`}>
+        
+        <div className="flex justify-end mb-8">
+          <button onClick={handleSkip} className="text-sm text-gray-500 dark:text-gray-400 hover:text-[#115488] transition-colors font-medium">
+            Skip
+          </button>
         </div>
 
-        <footer className="mt-12 flex items-center gap-4">
+        {/* 2. Step Header */}
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-[#115488] mb-4">
+          Step 01 <span className="text-gray-300 dark:text-gray-800">/ 04</span>
+        </p>
+        
+        <header className="mb-10">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3 italic">What describes you best?</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed font-medium">
+            Select your primary role to help others understand your expertise within the teemit community.
+          </p>
+        </header>
+
+        {/* 3. Selection Grid (Pill Style) */}
+        <div className={`flex flex-wrap gap-3 p-1 transition-all rounded-2xl ${error ? 'ring-2 ring-red-500/20' : ''}`}>
+          {ROLES.map((role) => (
+            <button
+              key={role}
+              onClick={() => {
+                setSelectedRole(role)
+                setError(false) // रोल चुनते ही रेड एरर हटा दें
+              }}
+              className={`px-5 py-2.5 rounded-full text-sm font-bold border transition-all duration-300 ${
+                selectedRole === role 
+                ? 'bg-[#115488] border-[#115488] text-white shadow-xl shadow-[#115488]/20 scale-105' 
+                : 'bg-white dark:bg-[#0A0A0A] border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-600'
+              }`}
+            >
+              {role}
+            </button>
+          ))}
+        </div>
+
+        {/* 4. Error Message - केवल तभी दिखेगा जब बिना चुने Continue दबाएंगे */}
+        {error && (
+          <div className="mt-6 flex items-center gap-2 text-red-500 animate-in fade-in slide-in-from-left-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <p className="text-[10px] font-black uppercase tracking-widest">Please select a role to continue</p>
+          </div>
+        )}
+
+        {/* 5. Action Footer */}
+        <footer className="mt-12">
           <button 
             onClick={handleNext}
             disabled={loading}
-            className="flex-1 bg-black dark:bg-white text-white dark:text-black py-4 rounded-2xl font-bold text-sm hover:shadow-2xl hover:shadow-[#115488]/20 transition-all active:scale-95 disabled:opacity-50"
+            className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:shadow-2xl hover:shadow-[#115488]/30 transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
           >
-            {loading ? 'Saving...' : 'Continue'}
+            {loading ? 'Processing...' : 'Continue'}
           </button>
-          <button 
-            onClick={() => router.push('/onboarding/interests')}
-            className="px-6 py-4 text-gray-400 font-bold text-sm hover:text-[#115488] transition-colors"
-          >
-            Skip
-          </button>
+          
+          <p className="mt-8 text-center text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-relaxed">
+            You can always update your role later from your profile settings.
+          </p>
         </footer>
+
       </div>
     </div>
   )
